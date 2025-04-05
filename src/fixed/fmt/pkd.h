@@ -40,7 +40,11 @@ bool read_PKD(DataStream &f)
     // initialize global pointers
     gBrightness = -128;
     palSet(level.palette, gSettings.video_gamma << 4, gBrightness);
+#ifdef __AMIGA__
+    memcpy(gLightmap, level.lightmap, 256 * 32);
+#else
     memcpy(gLightmap, level.lightmap, sizeof(gLightmap));
+#endif
 #endif
 
 #ifdef ROM_READ

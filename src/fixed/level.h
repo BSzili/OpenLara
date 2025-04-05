@@ -8,6 +8,8 @@ Level level;
 
 #ifdef __32X__
     extern uint8 gLightmap[256 * 32]; // SDRAM 8k at 0x6000000
+#elif defined(__AMIGA__)
+    extern uint8* gLightmap;
 #else
     #ifndef MODEHW
         IWRAM_DATA uint8 gLightmap[256 * 32]; // IWRAM 8k

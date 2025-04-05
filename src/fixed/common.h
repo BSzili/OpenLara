@@ -159,6 +159,28 @@
         MARS_CMD_CLEAR,
         MARS_CMD_FLUSH
     };
+#elif defined(__AMIGA__)
+    #define USE_DIV_TABLE
+    #define CPU_BIG_ENDIAN
+    //#define USE_ASM
+    #define TEX_2PX
+    //#define ALIGNED_LIGHTMAP
+    //#define USE_MATRIX_INT16
+
+#if 0
+    #define MODE4 // wider FOV
+    #define FRAME_WIDTH  160
+    #define FRAME_HEIGHT 128
+#else
+    #define MODE13
+    #define FRAME_WIDTH  320
+    #define FRAME_HEIGHT 200
+#endif
+
+    #define USE_FMT     (LVL_FMT_PKD)
+
+    extern "C" void kprintf(const char *fmt, ...);
+
 #else
     #error unsupported platform
 #endif
@@ -188,7 +210,9 @@
 
 #include "stdio.h" // TODO_3DO armcpp bug?
 
+#if !defined(__AMIGA__)
 #include <math.h>
+#endif
 #include <limits.h>
 
 #ifndef USE_FMT
@@ -243,6 +267,13 @@
     #define VIEW_DIST (10 << 10)
 // skip collideSpheres for enemies
     #define FAST_HITMASK
+#endif
+
+#ifdef __AMIGA__
+// hide dead enemies after a while to reduce the number of polygons on the screen
+    #define HIDE_CORPSES (30*10) // 10 sec
+// replace trap flor geometry by two flat quads in the static state
+    #define LOD_TRAP_FLOOR
 #endif
 
 #ifndef NAV_STEPS
@@ -306,13 +337,17 @@ inline void* operator new(size_t, void *ptr)
     return ptr;
 }
 
-#if defined(__3DO__) || defined(__32X__)
+#if defined(__3DO__) || defined(__32X__) || defined(__AMIGA__)
 X_INLINE int32 abs(int32 x) {
     return (x >= 0) ? x : -x;
 }
 #endif
 
-#if defined(__GBA__) || defined(__NDS__) || defined(__32X__)
+#ifdef __AMIGA__
+extern "C" char* itoa(int value, char *str, int base);
+#endif
+
+#if defined(__GBA__) || defined(__NDS__) || defined(__32X__) || defined(__AMIGA__)
     #define int2str(x,str) itoa(x, str, 10)
 #elif defined(__3DO__)
     #define int2str(x,str) sprintf(str, "%d", x)
@@ -350,6 +385,8 @@ X_INLINE int32 abs(int32 x) {
     extern uint16 fb[FRAME_WIDTH * FRAME_HEIGHT];
 #elif defined(__DOS__)
     extern uint16 fb[FRAME_WIDTH * FRAME_HEIGHT];
+#elif defined(__AMIGA__)
+    extern uint8 fb[FRAME_WIDTH * FRAME_HEIGHT];
 #endif
 
 #define STATIC_MESH_FLAG_NO_COLLISION   1
@@ -408,7 +445,7 @@ extern uint8* vramPtr;
     #define SND_DECODE(x)    ((x) - 128)
     #define SND_MIN          -128
     #define SND_MAX          127
-#elif defined(__DOS__)
+#elif defined(__DOS__) || defined(__AMIGA__)
     #define SND_SAMPLES      1024
     #define SND_OUTPUT_FREQ  11025
     #define SND_SAMPLE_FREQ  11025
@@ -2807,7 +2844,7 @@ void matrixFrame_c(const void* pos, const void* angles);
 void matrixFrameLerp(const void* pos, const void* anglesA, const void* anglesB, int32 delta, int32 rate);
 void matrixSetView(const vec3i &pos, int32 angleX, int32 angleY);
 
-#if defined(__GBA__) || defined(__GBA_WIN__)
+#if defined(__GBA__) || defined(__GBA_WIN__) || defined(__AMIGA__)
 #define renderInit()
 #define renderFree()
 #define renderSwap()
@@ -2940,7 +2977,7 @@ const void* osLoadLevel(LevelID id);
 
     extern uint32 gCounters[CNT_MAX];
     
-    #if defined(__3DO__) || defined(__32X__) // should be first, armcpp bug (#elif)
+    #if defined(__3DO__) || defined(__32X__) || defined(__AMIGA__) // should be first, armcpp bug (#elif)
         extern int32 g_timer;
 
         #define PROFILE_START() {\

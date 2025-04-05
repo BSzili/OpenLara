@@ -2793,7 +2793,7 @@ struct Lara : ItemObj
         if (keys & IK_Y) input |= IN_JUMP;
         if (keys & IK_L) input |= IN_LOOK;
         if (keys & IK_R) input |= IN_WALK;
-    #elif defined(__WIN32__)
+    #elif defined(__WIN32__) || defined(__AMIGA__)
         if (keys & IK_A) input |= IN_ACTION;
         if (keys & IK_B) input |= IN_UP | IN_DOWN;
         if (keys & IK_Y) input |= IN_WEAPON;
