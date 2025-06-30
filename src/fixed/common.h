@@ -179,7 +179,8 @@
 
     #define USE_FMT     (LVL_FMT_PKD)
 
-    extern "C" void kprintf(const char *fmt, ...);
+    extern "C" __stdargs void kprintf(const char *fmt, ...);
+    extern "C" __stdargs char* itoa(int value, char *str, int base);
 
 #else
     #error unsupported platform
@@ -341,10 +342,6 @@ inline void* operator new(size_t, void *ptr)
 X_INLINE int32 abs(int32 x) {
     return (x >= 0) ? x : -x;
 }
-#endif
-
-#ifdef __AMIGA__
-extern "C" char* itoa(int value, char *str, int base);
 #endif
 
 #if defined(__GBA__) || defined(__NDS__) || defined(__32X__) || defined(__AMIGA__)

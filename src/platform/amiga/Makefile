@@ -19,7 +19,7 @@ INCPATH = -I. -I../../fixed
 
 CFLAGS = -m68020 -Wall -Wstack-usage=1024 -c
 # -g
-CFLAGS += -O2 -fbbb=- -fomit-frame-pointer -DNDEBUG
+CFLAGS += -O2 -fbbb=- -fomit-frame-pointer -mregparm=4 -DNDEBUG
 #CFLAGS += -save-temps
 #CFLAGS += -DPROFILING
 CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions
