@@ -111,25 +111,10 @@ void rasterizeS_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
             {
                 uint8* ptr = (uint8*)pixel + x1;
 
-                if (x1 & 1)
+                while (width--)
                 {
-                    ptr[0] = ft_lightmap[ptr[0]];
-                    ptr++;
-                    width--;
-                }
-
-                if (width & 1)
-                {
-                    width--;
-                    ptr[width] = ft_lightmap[ptr[width]];
-                }
-
-                while (width)
-                {
-                    ptr[0] = ft_lightmap[ptr[0]];
-                    ptr[1] = ft_lightmap[ptr[1]];
-                    ptr += 2;
-                    width -= 2;
+                    uint8 index = ft_lightmap[*ptr];
+                    *ptr++ = index;
                 }
             }
 
@@ -224,24 +209,11 @@ void rasterizeF_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
                     ptr[width - 1] = uint8(color);
                 }
 
-                if (width & 2)
-                {
-                    *(uint16*)ptr = color;
-                    ptr += 2;
-                }
-
-                width >>= 2;
+                width >>= 1;
                 while (width--)
                 {
-#if 1
-                    *(uint32*)ptr = color | color << 16;
-                    ptr += 4;
-#else
                     *(uint16*)ptr = color;
                     ptr += 2;
-                    *(uint16*)ptr = color;
-                    ptr += 2;
-#endif
                 }
             }
 
@@ -340,6 +312,7 @@ void rasterizeFT_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
 
                 uint8* ptr = (uint8*)pixel + x1;
 
+            #ifdef TEX_2PX
                 if (intptr_t(ptr) & 1)
                 {
                     *ptr++ = ft_lightmap[tile[(t & 0xFF00) | (t >> 24)]];
@@ -354,7 +327,6 @@ void rasterizeFT_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
                 }
 
                 width >>= 1;
-            #ifdef TEX_2PX
                 dtdx <<= 1;
 
                 while (width--)
@@ -369,14 +341,9 @@ void rasterizeFT_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
             #else
                 while (width--)
                 {
-                    uint8 indexA = ft_lightmap[tile[(t & 0xFF00) | (t >> 24)]];
+                    uint8 index = ft_lightmap[tile[(t & 0xFF00) | (t >> 24)]];
                     t += dtdx;
-                    uint8 indexB = ft_lightmap[tile[(t & 0xFF00) | (t >> 24)]];
-                    t += dtdx;
-                    
-                    *(uint16*)ptr = indexB | (indexA << 8);
-
-                    ptr += 2;
+                    *ptr++ = index;
                 }
             #endif
             }
@@ -500,6 +467,7 @@ void rasterizeGT_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
 
                 uint8* ptr = (uint8*)pixel + x1;
 
+            #ifdef TEX_2PX
                 if (intptr_t(ptr) & 1)
                 {
                 #ifdef ALIGNED_LIGHTMAP
@@ -527,8 +495,6 @@ void rasterizeGT_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
                 }
 
                 width >>= 1;
-
-            #ifdef TEX_2PX
                 dtdx <<= 1;
                 while (width--)
                 {
@@ -544,6 +510,7 @@ void rasterizeGT_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
                     g += dgdx;
                 }
             #else
+                dgdx >>= 1;
                 while (width--)
                 {
                 #ifdef ALIGNED_LIGHTMAP
@@ -552,15 +519,11 @@ void rasterizeGT_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
                     const uint8* LMAP = &lightmap[g >> 8 << 8];
                 #endif
 
-                    uint8 indexA = LMAP[tile[(t & 0xFF00) | (t >> 24)]];
-                    t += dtdx;
-                    uint8 indexB = LMAP[tile[(t & 0xFF00) | (t >> 24)]];
+                    uint8 index = LMAP[tile[(t & 0xFF00) | (t >> 24)]];
                     t += dtdx;
                     g += dgdx;
-                    
-                    *(uint16*)ptr = indexB | (indexA << 8);
 
-                    ptr += 2;
+                    *ptr++ = index;
                 }
             #endif
             }
@@ -664,6 +627,7 @@ void rasterizeFTA_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
 
                 uint8* ptr = (uint8*)pixel + x1;
 
+            #ifdef TEX_2PX
                 if (intptr_t(ptr) & 1)
                 {
                     uint8 indexB = tile[(t & 0xFF00) | (t >> 24)];
@@ -685,7 +649,6 @@ void rasterizeFTA_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
                 }
 
                 width >>= 1;
-            #ifdef TEX_2PX
                 dtdx <<= 1;
 
                 while (width--)
@@ -703,20 +666,14 @@ void rasterizeFTA_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
             #else
                 while (width--)
                 {
-                    uint8 indexA = tile[(t & 0xFF00) | (t >> 24)];
+                    uint8 index = tile[(t & 0xFF00) | (t >> 24)];
                     t += dtdx;
-                    uint8 indexB = tile[(t & 0xFF00) | (t >> 24)];
-                    t += dtdx;
-                    
-                    if (indexA && indexB) {
-                        *(uint16*)ptr = ft_lightmap[indexB] | (ft_lightmap[indexA] << 8);
-                    } /*else if (indexA) {
-                        *(uint16*)ptr = (*(uint16*)ptr & 0xFF00) | ft_lightmap[indexA];
-                    } else if (indexB) {
-                        *(uint16*)ptr = (*(uint16*)ptr & 0x00FF) | (ft_lightmap[indexB] << 8);
-                    }*/
 
-                    ptr += 2;
+                    if (index) {
+                        *ptr = ft_lightmap[index];
+                    }
+
+                    ptr++;
                 }
             #endif
             }
@@ -840,6 +797,7 @@ void rasterizeGTA_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
 
                 uint8* ptr = (uint8*)pixel + x1;
 
+            #ifdef TEX_2PX
                 if (intptr_t(ptr) & 1)
                 {
                     uint8 indexA = tile[(t & 0xFF00) | (t >> 24)];
@@ -872,8 +830,6 @@ void rasterizeGTA_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
                 }
 
                 width >>= 1;
-
-            #ifdef TEX_2PX
                 dtdx <<= 1;
                 while (width--)
                 {
@@ -892,23 +848,23 @@ void rasterizeGTA_c(uint16* pixel, const VertexLink* L, const VertexLink* R)
                     g += dgdx;
                 }
             #else
+                dgdx >>= 1;
                 while (width--)
                 {
-                    uint8 indexA = tile[(t & 0xFF00) | (t >> 24)];
-                    t += dtdx;
-                    uint8 indexB = tile[(t & 0xFF00) | (t >> 24)];
+                    uint8 index = tile[(t & 0xFF00) | (t >> 24)];
                     t += dtdx;
                     g += dgdx;
-                    if (indexA && indexB) {
+
+                    if (index) {
                 #ifdef ALIGNED_LIGHTMAP
                         const uint8* LMAP = (uint8*)(g >> 8 << 8);
                 #else
                         const uint8* LMAP = &lightmap[g >> 8 << 8];
                 #endif
-                        *(uint16*)ptr = LMAP[indexB] | (LMAP[indexA] << 8);
+                        *ptr = LMAP[index];
                     }
 
-                    ptr += 2;
+                    ptr++;
                 }
             #endif
             }
@@ -984,26 +940,11 @@ X_NOINLINE void rasterizeFillS_c(uint16* pixel, const VertexLink* L, const Verte
     for (int32 i = 0; i < height; i++)
     {
         uint8* ptr = (uint8*)pixel + x;
-        int32 w = width;
 
-        if (intptr_t(ptr) & 1)
+        for (int32 i = 0; i < width; i++)
         {
-            ptr[0] = lm[ptr[0]];
-            ptr++;
-            w--;
-        }
-
-        if (w & 1)
-        {
-            w--;
-            ptr[w] = lm[ptr[w]];
-        }
-
-        for (int32 i = 0; i < w / 2; i++)
-        {
-            uint16 p = *(uint16*)ptr;
-            *(uint16*)ptr = lm[p & 0xFF] | (lm[p >> 8] << 8);
-            ptr += 2;
+            uint8 index = *ptr;
+            *ptr++ = lm[index];
         }
 
         pixel += FRAME_WIDTH / 2;
@@ -1074,7 +1015,7 @@ X_NOINLINE void rasterizeSprite_c(uint16* pixel, const VertexLink* L, const Vert
 
         for (int32 x = 0; x < w; x++)
         {
-            uint8 indexB = xtile[xu >> 8];//indexB = 255;
+            uint8 indexB = xtile[xu >> 8];
             xu += du;
             if (indexB) xptr[0] = ft_lightmap[indexB];
             xptr++;
