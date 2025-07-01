@@ -24,6 +24,7 @@
 #include <SDI_compiler.h>
 
 //#define ECSHACK
+#define UWCOLORS
 
 
 static struct Window *window;
@@ -32,6 +33,8 @@ static UWORD *pointermem;
 struct Library *CyberGfxBase;
 static int currentBitMap;
 static struct ScreenBuffer *sbuf[2];
+static ULONG spal[1 + (256 * 3) + 1];
+static int updatePalette = 0;
 static int use_c2p = 0;
 static ULONG fsMonitorID = INVALID_ID;
 
@@ -55,6 +58,11 @@ int32 fps;
 int32 frameIndex = 0;
 int32 fpsCounter = 0;
 uint32 curSoundBuffer = 0;
+static uint8 paletteColor[768];
+#ifdef UWCOLORS
+static uint8 paletteWater[768];
+#endif
+static uint8 *paletteCurrent;
 
 //uint8 gLightmap[256 * 32];
 uint8* gLightmap;
@@ -247,35 +255,26 @@ void setTextMode()
 
 void osSetPalette(const uint16* palette)
 {
-
-#ifdef ECSHACK
+    uint8* ppc = paletteColor;
+    uint8* ppw = paletteWater;
     for (int32 i = 0; i < 256; i++)
     {
         uint16 p = *palette++;
+        uint8 r = (p & 31) << 3;
+        uint8 g = ((p >> 5) & 31) << 3;
+        uint8 b = ((p >> 10) & 31) << 3;
 
-        uint8 r = (p & 31);
-        uint8 g = ((p >> 5) & 31);
-        uint8 b = ((p >> 10) & 31);
+        *ppc++ = r;
+        *ppc++ = g;
+        *ppc++ = b;
 
-        uint32 lum = (r * 77 + g * 150 + b * 29) >> 9;
-        ecsRemap[i] = lum;
-    }
-#else
-    static ULONG spal[1 + (256 * 3) + 1];
-    ULONG *sp = spal;
-
-    *sp++ = 256 << 16;
-    for (int32 i = 0; i < 256; i++)
-    {
-        uint16 c = *palette++;
-        //kprintf("%s %3lu %4lx\n", __FUNCTION__, i, c);
-        *sp++ = (ULONG)(c & 0x1F) << 27;
-        *sp++ = (ULONG)((c >> 5) & 0x1F) << 27;
-        *sp++ = (ULONG)((c >> 10) & 0x1F) << 27;
-    }
-    *sp = 0;
-    LoadRGB32(&screen->ViewPort, spal);
+#ifdef UWCOLORS
+        *ppw++ = ((uint16)r * 170) >> 8;
+        *ppw++ = ((uint16)g * 170) >> 8;
+        *ppw++ = b;
 #endif
+    }
+    updatePalette = 1;
 }
 
 void timerISR()
@@ -312,6 +311,34 @@ void waitVBlank()
 
 void blit()
 {
+    if (updatePalette) {
+#ifdef ECSHACK
+        for (int32 i = 0; i < 256; i++)
+        {
+            uint8 r = paletteCurrent[i*3 + 0];
+            uint8 g = paletteCurrent[i*3 + 1];
+            uint8 b = paletteCurrent[i*3 + 2];
+
+            uint32 lum = (r * 77 + g * 150 + b * 29) >> 12;
+            ecsRemap[i] = lum;
+        }
+#else
+        //static ULONG spal[1 + (256 * 3) + 1];
+        ULONG *sp = spal;
+        uint8 *pp = paletteCurrent;
+
+        *sp++ = 256 << 16;
+        for (int32 i = 0; i < 256; i++)
+        {
+            *sp++ = *((ULONG *)pp++);
+            *sp++ = *((ULONG *)pp++);
+            *sp++ = *((ULONG *)pp++);
+        }
+        *sp = 0;
+        LoadRGB32(&screen->ViewPort, spal);
+#endif
+        updatePalette = 0;
+    }
     if (use_c2p) {
         //WriteChunkyPixels(window->RPort, 0, 0, FRAME_WIDTH - 1, FRAME_HEIGHT - 1, (UBYTE *)fb, FRAME_WIDTH);
         currentBitMap ^= 1;
@@ -548,6 +575,26 @@ APTR AllocMemAligned(ULONG byteSize, ULONG attributes, ULONG alignSize, ULONG al
     return finalMem;
 }
 
+
+static void checkPalette(void)
+{
+    const ItemObj* lara = players[0];
+    if (!lara)
+    {
+        paletteCurrent = paletteColor;
+        return;
+    }
+#ifdef UWCOLORS
+    const Room* camRoom = lara->extraL->camera.view.room;
+    uint8* palette = (ROOM_FLAG_WATER(camRoom->info->flags) && inventory.state == INV_STATE_NONE) ? paletteWater : paletteColor;
+    if (paletteCurrent != palette)
+    {
+        updatePalette = 1;
+        paletteCurrent = palette;
+    }
+#endif
+}
+
 int main(void)
 {
     videoAcquire();
@@ -601,6 +648,7 @@ int main(void)
         #endif
 
         gameRender();
+        checkPalette();
 
         fpsCounter++;
         if (frameIndex >= 60) {
