@@ -311,6 +311,10 @@ void waitVBlank()
 
 void blit()
 {
+    if (screen && screen == IntuitionBase->FirstScreen && !(window->Flags & WFLG_WINDOWACTIVE)) {
+        ActivateWindow(window);
+    }
+
     if (updatePalette) {
 #ifdef ECSHACK
         for (int32 i = 0; i < 256; i++)
@@ -508,6 +512,12 @@ const void* osLoadLevel(LevelID id)
     if (levelData)
     {
         delete[] levelData;
+    }
+
+    if (TITLE_SCR)
+    {
+        delete[] TITLE_SCR;
+        TITLE_SCR = NULL;
     }
 
     strcpy(buf, "data/");
