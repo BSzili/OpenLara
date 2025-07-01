@@ -35,12 +35,16 @@ static struct ScreenBuffer *sbuf[2];
 static int use_c2p = 0;
 static ULONG fsMonitorID = INVALID_ID;
 
-extern "C" void ASM c2p1x1_8_c5_bm(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
+typedef void ASM (*c2p_write_bm_func)(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
+static c2p_write_bm_func c2p_write_bm;
 #ifdef ECSHACK
 extern "C" void ASM c2p1x1_4_c5_bm_word(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
 static UWORD ecsPalette[16] = { 0x0000, 0x0111, 0x0222, 0x0333, 0x0444, 0x0555, 0x0666, 0x0777, 0x0888, 0x0999, 0x0AAA, 0x0BBB, 0x0CCC, 0x0DDD, 0x0EEE, 0x0FFF };
 static uint8 ecsfb[FRAME_WIDTH*FRAME_HEIGHT];
 static uint8 ecsRemap[256];
+#else
+extern "C" void ASM c2p1x1_8_c5_bm(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
+extern "C" void ASM c2p1x1_8_c5_bm_040(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
 #endif
 
 
@@ -103,7 +107,7 @@ static void parseTooltypes(void)
     if ((appicon = GetDiskObject((STRPTR)exename))) {
         char *value;
 
-        if ((value = (char *)FindToolType((STRPTR *)appicon->do_ToolTypes, (CONST_STRPTR)"FORCEMODE"))) {
+        if ((value = (char *)FindToolType((CONST STRPTR *)appicon->do_ToolTypes, (CONST_STRPTR)"FORCEMODE"))) {
             if (!strcmp(value, "NTSC"))
                 fsMonitorID = NTSC_MONITOR_ID;
             else if (!strcmp(value, "PAL"))
@@ -318,7 +322,7 @@ void blit()
         }
         c2p1x1_4_c5_bm_word(FRAME_WIDTH, FRAME_HEIGHT, 0, 0, ecsfb, sbuf[currentBitMap]->sb_BitMap);
 #else
-        c2p1x1_8_c5_bm(FRAME_WIDTH, FRAME_HEIGHT, 0, 0, fb, sbuf[currentBitMap]->sb_BitMap);
+        c2p_write_bm(FRAME_WIDTH, FRAME_HEIGHT, 0, 0, fb, sbuf[currentBitMap]->sb_BitMap);
 #endif
         ChangeScreenBuffer(screen, sbuf[currentBitMap]);
     } else if (CyberGfxBase) {
@@ -555,6 +559,12 @@ int main(void)
     gLightmap = (uint8*)AllocMemAligned(256 * 32, MEMF_ANY, 0x10000, 0);
 #else
     gLightmap = (uint8*)AllocMem(256 * 32, MEMF_ANY);
+#endif
+#ifndef ECSHACK
+    if (SysBase->AttnFlags & AFF_68040)
+        c2p_write_bm = c2p1x1_8_c5_bm_040;
+    else
+        c2p_write_bm = c2p1x1_8_c5_bm;
 #endif
 
     //gLevelID = LVL_TR1_1;
