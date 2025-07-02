@@ -442,7 +442,7 @@ extern uint8* vramPtr;
     #define SND_DECODE(x)    ((x) - 128)
     #define SND_MIN          -128
     #define SND_MAX          127
-#elif defined(__DOS__) || defined(__AMIGA__)
+#elif defined(__DOS__)
     #define SND_SAMPLES      1024
     #define SND_OUTPUT_FREQ  11025
     #define SND_SAMPLE_FREQ  11025
@@ -455,6 +455,14 @@ extern uint8* vramPtr;
     #define SND_OUTPUT_FREQ  11025
     #define SND_SAMPLE_FREQ  11025
     #define SND_ENCODE(x)    ((x) + 128)
+    #define SND_DECODE(x)    ((x) - 128)
+    #define SND_MIN          -128
+    #define SND_MAX          127
+#elif defined(__AMIGA__)
+    #define SND_SAMPLES      1024
+    #define SND_OUTPUT_FREQ  11025
+    #define SND_SAMPLE_FREQ  22050
+    #define SND_ENCODE(x)    (x)
     #define SND_DECODE(x)    ((x) - 128)
     #define SND_MIN          -128
     #define SND_MAX          127

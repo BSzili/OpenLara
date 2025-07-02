@@ -1098,9 +1098,24 @@ void checkTrigger(const FloorData* fd, ItemObj* lara)
                     if (FD_ONCE(data)) {
                         flags |= TRACK_FLAG_ONCE;
                     }
+#ifdef __AMIGA__
+                    // tutorial tracks
+                    if (track >= 26 && track <= 50) {
+                        int16 id = 174 + track - 26;
+                        int16 a = level.soundMap[id];
+                        if (a != -1) {
+                            const SoundInfo* b = level.soundsInfo + a;
+                            sndStop(); // crude but works
+                            sndPlaySample(b->index, (1 << SND_VOL_SHIFT), 64, SI_MODE(b->flags));
+                        }
+                    }
+#else
                     sndPlayTrack(track);
+#endif
                 } else {
+#ifndef __AMIGA__
                     sndStopTrack();
+#endif
                 }
                 break;
             }
@@ -1114,7 +1129,15 @@ void checkTrigger(const FloorData* fd, ItemObj* lara)
                 if (gSaveGame.secrets & (1 << FD_ARGS(triggerCmd)))
                     break;
                 gSaveGame.secrets |= (1 << FD_ARGS(triggerCmd));
+#ifdef __AMIGA__
+                int16 a = level.soundMap[SND_SECRET];
+                if (a != -1) {
+                    const SoundInfo* b = level.soundsInfo + a;
+                    sndPlaySample(b->index, (1 << SND_VOL_SHIFT), 128, SI_MODE(b->flags));
+                }
+#else
                 sndPlayTrack(13);
+#endif
                 break;
             }
 

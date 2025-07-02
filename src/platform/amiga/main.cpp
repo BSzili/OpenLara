@@ -57,7 +57,7 @@ int32 g_timer;
 int32 fps;
 int32 frameIndex = 0;
 int32 fpsCounter = 0;
-uint32 curSoundBuffer = 0;
+//uint32 curSoundBuffer = 0;
 static uint8 paletteColor[768];
 #ifdef UWCOLORS
 static uint8 paletteWater[768];
@@ -67,7 +67,6 @@ static uint8 *paletteCurrent;
 //uint8 gLightmap[256 * 32];
 uint8* gLightmap;
 
-const void* TRACKS_IMA;
 const void* TITLE_SCR;
 const void* levelData;
 
@@ -547,24 +546,6 @@ const void* osLoadLevel(LevelID id)
 
         levelData = data;
     }
-#if 0
-// tracks
-    if (!TRACKS_IMA)
-    {
-        FILE *f = fopen("data/TRACKS.IMA", "rb");
-        if (!f)
-            return NULL;
-
-        fseek(f, 0, SEEK_END);
-        int32 size = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        uint8* data = new uint8[size];
-        fread(data, 1, size, f);
-        Close(f);
-
-        TRACKS_IMA = data;
-    }
-#endif
 
     return (void*)levelData;
 }
@@ -624,6 +605,7 @@ int main(void)
         c2p_write_bm = c2p1x1_8_c5_bm;
 #endif
 
+    sndInit();
     //gLevelID = LVL_TR1_1;
     gLevelID = LVL_TR1_TITLE;
     //gLevelID = LVL_TR1_GYM;
@@ -672,6 +654,9 @@ int main(void)
 
         blit();
     }
+
+    extern void sndFree();
+    sndFree();
 
     FreeMem(gLightmap, 256 * 32);
 
