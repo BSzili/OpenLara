@@ -9,17 +9,17 @@ extern const uint8* gTile;
 
 #ifdef USE_ASM
     extern "C" {
-        void rasterize_dummy(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeS_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeF_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
+        void rasterize_dummy(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
+        void rasterizeS_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
+        void rasterizeF_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
         //void rasterizeG_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeFT_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeGT_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeFTA_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeGTA_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeLineH_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeLineV_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
-        void rasterizeFillS_asm(uint16* pixel, const VertexLink* L, const VertexLink* R);
+        void rasterizeFT_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
+        void rasterizeGT_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
+        void rasterizeFTA_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
+        void rasterizeGTA_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
+        void rasterizeLineH_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
+        void rasterizeLineV_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
+        void rasterizeFillS_asm(uint16* pixel __asm("a0"), const VertexLink* L __asm("a1"), const VertexLink* R __asm("a2"));
     }
 
     #define rasterizeS rasterizeS_asm

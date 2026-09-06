@@ -17,13 +17,20 @@ CC_VER := $(shell $(CC) -dumpversion)
 #LIBPATH = -L$(ROOTDIR)/lib
 INCPATH = -I. -I../../fixed
 
-CFLAGS = -m68020 -Wall -Wstack-usage=1024 -c
-# -g
-CFLAGS += -O2 -fbbb=- -fomit-frame-pointer -mregparm=4 -DNDEBUG
+CFLAGS = -m68020 -noixemul -Wall -Wstack-usage=1024 -c
+CFLAGS += -O1 -fbbb=- -fomit-frame-pointer -DNDEBUG -mno-bitfield
+
+#CFLAGS += -g
+CFLAGS += -DUSE_ASM
+CFLAGS += -DUSE_MATRIX_INT16
+
+CFLAGS += -DNO_FPS_CAP
+	
 #CFLAGS += -save-temps
 #CFLAGS += -DPROFILING
-CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions
-LDFLAGS = -m68020 -Wl,-Map=$(BUILD)/output.map -fno-rtti -fno-exceptions
+
+CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions 
+LDFLAGS = -m68020 -noixemul -Wl,-Map=$(BUILD)/output.map -fno-rtti -fno-exceptions
 # -nostdlib
 ASFLAGS = -Fhunk -m68020 -quiet
 
@@ -58,21 +65,27 @@ $(TARGET): $(OBJS)
 	$(CXX) $(LDFLAGS) $(OBJS) $(LIBS) -o $(TARGET)
 	$(STRIP) $(TARGET)
 
-$(BUILD)/%.o: %.s
+$(BUILD)/%.o: %.s | $(BUILD)
 	$(AS) $(ASFLAGS) $(INCPATH) -o $@ $<
 
-$(BUILD)/%.o: asm/%.s
-	$(CPP) $(INCPATH) -o $(BUILD)/$(notdir $<) $<
+$(BUILD)/%.o: asm/%.s | $(BUILD)
+	$(CPP) -P $(INCPATH) -o $(BUILD)/$(notdir $<) $<
 	$(AS) $(ASFLAGS) $(INCPATH) -o $@ $(BUILD)/$(notdir $<)
 
-$(BUILD)/%.o: %.c
+$(BUILD)/%.o: %.c | $(BUILD)
 	$(CC) $(CFLAGS) $(INCPATH) -o $@ $<
 
-$(BUILD)/%.o: %.cpp
+$(BUILD)/%.o: %.cpp | $(BUILD)
 	$(CXX) $(CXXFLAGS) $(INCPATH) -o $@ $<
 
-$(BUILD)/%.o: ../../fixed/%.cpp
+$(BUILD)/main.o: main.cpp | $(BUILD)
+	$(CXX) $(CFLAGS) -O0 -fno-rtti -fno-exceptions $(INCPATH) -o $@ $<
+
+$(BUILD)/render.o: render.cpp rasterizer.h | $(BUILD)
 	$(CXX) $(CXXFLAGS) $(INCPATH) -o $@ $<
+
+$(BUILD)/common.o: ../../fixed/common.cpp | $(BUILD)
+	$(CXX) $(CFLAGS) -O0 -fno-rtti -fno-exceptions $(INCPATH) -o $@ $<
 
 clean:
 	$(RM) $(BUILD)/* $(TARGET)

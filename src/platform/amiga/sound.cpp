@@ -36,9 +36,9 @@ int8 musicBuffer[2 * SND_SAMPLES] __attribute((__chip__));
     #define sndPCM_mix     sndPCM_mix_asm
 
     extern "C" {
-        void sndADPCM4_fill_asm(ADPCM4_STATE &state, int8* buffer, const uint8* data, int32 size);
-        int32 sndPCM_fill_asm(int32 pos, int32 inc, int32 size, int32 volume, const uint8* data, int8* buffer);
-        int32 sndPCM_mix_asm(int32 pos, int32 inc, int32 size, int32 volume, const uint8* data, int8* buffer);
+        void sndADPCM4_fill_asm(ADPCM4_STATE &state __asm("a0"), int8* buffer __asm("a1"), const uint8* data __asm("a2"), int32 size __asm("d0"));
+        int32 sndPCM_fill_asm(int32 pos __asm("d0"), int32 inc __asm("d1"), int32 size __asm("d2"), int32 volume __asm("d3"), const uint8* data __asm("a0"), int8* buffer __asm("a1"));
+        int32 sndPCM_mix_asm(int32 pos __asm("d0"), int32 inc __asm("d1"), int32 size __asm("d2"), int32 volume __asm("d3"), const uint8* data __asm("a0"), int8* buffer __asm("a1"));
     }
 #else
     #define sndADPCM4_fill sndADPCM4_c
@@ -226,6 +226,9 @@ INTERRUPTPROTO(AudioFunc, ULONG, struct Custom *c, APTR data)
 
 void sndFree()
 {
+    struct Interrupt *restoreAud0 = NULL;
+    struct Interrupt *restoreAud2 = NULL;
+
     if (oldFilter) {
         ciaa->ciapra |= oldFilter;
         oldFilter = 0;
@@ -234,24 +237,29 @@ void sndFree()
     if (oldIntAud0) {
         custom->dmacon = DMAF_AUD0|DMAF_AUD1;
         custom->intena = INTF_AUD0;
-        SetIntVector(INTB_AUD0, oldIntAud0);
+        custom->intreq = INTF_AUD0;
+        restoreAud0 = oldIntAud0;
         oldIntAud0 = NULL;
     }
 
     if (oldIntAud2) {
         custom->dmacon = DMAF_AUD2|DMAF_AUD3;
         custom->intena = INTF_AUD2;
-        SetIntVector(INTB_AUD0, oldIntAud2);
+        custom->intreq = INTF_AUD2;
+        restoreAud2 = oldIntAud2;
         oldIntAud2 = NULL;
     }
 
     if (!audioDev) {
-        audioIO->ioa_Request.io_Command = CMD_RESET;
-        audioIO->ioa_Request.io_Flags = 0;
-        DoIO((struct IORequest *)audioIO);
         CloseDevice((struct IORequest *)audioIO);
         audioDev = -1;
     }
+
+    if (restoreAud0)
+        SetIntVector(INTB_AUD0, restoreAud0);
+
+    if (restoreAud2)
+        SetIntVector(INTB_AUD2, restoreAud2);
 
     if (audioIO) {
         DeleteIORequest((struct IORequest *)audioIO);

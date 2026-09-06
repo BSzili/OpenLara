@@ -116,7 +116,7 @@ X_INLINE Face* faceAdd(int32 depth)
 }
 
 extern "C" {
-    X_NOINLINE void drawPoly(uint32 flags, VertexLink* v);
+    X_NOINLINE void drawPoly_c(uint32 flags, VertexLink* v);
 }
 
 #ifdef USE_ASM
@@ -127,20 +127,22 @@ extern "C" {
     #define faceAddRoomTriangles    faceAddRoomTriangles_asm
     #define faceAddMeshQuads        faceAddMeshQuads_asm
     #define faceAddMeshTriangles    faceAddMeshTriangles_asm
-    #define rasterize               rasterize_asm
-    #define clearFB                 clearFB_asm
+    #define clearFB(fb)             clearFB_asm(fb)
+    #define drawPoly                drawPoly_asm
 
     extern "C" {
-        void transformRoom_asm(const RoomVertex* vertices, int32 count);
-        void transformRoomUW_asm(const RoomVertex* vertices, int32 count);
-        void transformMesh_asm(const MeshVertex* vertices, int32 count, int32 intensity);
-        void faceAddRoomQuads_asm(const RoomQuad* polys, int32 count);
-        void faceAddRoomTriangles_asm(const RoomTriangle* polys, int32 count);
-        void faceAddMeshQuads_asm(const MeshQuad* polys, int32 count);
-        void faceAddMeshTriangles_asm(const MeshTriangle* polys, int32 count);
-        void rasterize_asm(uint32 flags, VertexLink* top);
-        void clearFB_asm(void* fb);
+        void transformRoom_asm(const RoomVertex* vertices __asm("a0"), int32 count __asm("d0"));
+        void transformRoomUW_asm(const RoomVertex* vertices __asm("a0"), int32 count __asm("d0"));
+        void transformMesh_asm(const MeshVertex* vertices __asm("a0"), int32 count __asm("d0"), int32 intensity __asm("d1"));
+        void faceAddRoomQuads_asm(const RoomQuad* polys __asm("a0"), int32 count __asm("d0"));
+        void faceAddRoomTriangles_asm(const RoomTriangle* polys __asm("a0"), int32 count __asm("d0"));
+        void faceAddMeshQuads_asm(const MeshQuad* polys __asm("a0"), int32 count __asm("d0"));
+        void faceAddMeshTriangles_asm(const MeshTriangle* polys __asm("a0"), int32 count __asm("d0"));
+        void clearFB_asm(void* fb __asm("a0"));
+        void drawPoly_asm(uint32 flags __asm("d0"), VertexLink* v __asm("a0"));
     }
+
+    #define rasterize               rasterize_c
 #else
     #define transformRoom           transformRoom_c
     #define transformRoomUW         transformRoomUW_c
@@ -151,6 +153,8 @@ extern "C" {
     #define faceAddMeshTriangles    faceAddMeshTriangles_c
     #define rasterize               rasterize_c
     #define clearFB(fb)             dmaFill(fb, 0, FRAME_WIDTH * FRAME_HEIGHT)
+    #define drawPoly                drawPoly_c
+#endif
 
 X_INLINE bool checkBackface(const Vertex* a, const Vertex* b, const Vertex* c)
 {
@@ -556,30 +560,25 @@ int32 sphereIsVisible_c(int32 sx, int32 sy, int32 sz, int32 r)
     return 1;
 }
 
-typedef void (*RasterProc)(uint16* pixel, const VertexLink* L, const VertexLink* R);
-
-RasterProc gRasterProc[FACE_TYPE_MAX] = { // IWRAM
-    rasterizeS,
-    rasterizeF,
-    rasterizeFT,
-    rasterizeFTA,
-    rasterizeGT,
-    rasterizeGTA,
-    rasterizeSprite,
-    rasterizeFillS,
-    rasterizeLineH,
-    rasterizeLineV
-};
-
-X_NOINLINE void rasterize_c(uint32 flags, VertexLink* top)
+extern "C" X_NOINLINE void rasterize_c(uint32 flags, VertexLink* top)
 {
     uint8* pixel = (uint8*)fb + top->v.y * FRAME_WIDTH;
-
     uint32 type = (flags >> FACE_TYPE_SHIFT) & FACE_TYPE_MASK;
-
     VertexLink* R = (type == FACE_TYPE_F) ? (VertexLink*)(flags & 0xFF) : top;
 
-    gRasterProc[type]((uint16*)pixel, top, R);
+    switch (type)
+    {
+        case FACE_TYPE_SHADOW: rasterizeS((uint16*)pixel, top, R); break;
+        case FACE_TYPE_F: rasterizeF((uint16*)pixel, top, R); break;
+        case FACE_TYPE_FT: rasterizeFT((uint16*)pixel, top, R); break;
+        case FACE_TYPE_FTA: rasterizeFTA((uint16*)pixel, top, R); break;
+        case FACE_TYPE_GT: rasterizeGT((uint16*)pixel, top, R); break;
+        case FACE_TYPE_GTA: rasterizeGTA((uint16*)pixel, top, R); break;
+        case FACE_TYPE_SPRITE: rasterizeSprite((uint16*)pixel, top, R); break;
+        case FACE_TYPE_FILL_S: rasterizeFillS((uint16*)pixel, top, R); break;
+        case FACE_TYPE_LINE_H: rasterizeLineH((uint16*)pixel, top, R); break;
+        case FACE_TYPE_LINE_V: rasterizeLineV((uint16*)pixel, top, R); break;
+    }
 }
 
 void flush_c()
@@ -691,9 +690,8 @@ void flush_c()
         } while (face);
     }
 }
-#endif
 
-extern "C" X_NOINLINE void drawPoly(uint32 flags, VertexLink* v)
+extern "C" X_NOINLINE void drawPoly_c(uint32 flags, VertexLink* v)
 {
     #define LERP_SHIFT          6
     #define LERP(a,b,t)         (b + ((a - b) * t >> LERP_SHIFT))

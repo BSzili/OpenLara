@@ -2709,20 +2709,20 @@ vec3i boxPushOut(const AABBi &a, const AABBi &b);
     extern "C" {
         void matrixPush_asm();
         void matrixSetIdentity_asm();
-        void matrixSetBasis_asm(Matrix &dst, const Matrix &src);
-        void matrixLerp_asm(const Matrix &n, int32 pmul, int32 pdiv);
-        void matrixTranslateRel_asm(int32 x, int32 y, int32 z);
-        void matrixTranslateAbs_asm(int32 x, int32 y, int32 z);
-        void matrixTranslateSet_asm(int32 x, int32 y, int32 z);
-        void matrixRotateX_asm(int32 angle);
-        void matrixRotateY_asm(int32 angle);
-        void matrixRotateZ_asm(int32 angle);
-        void matrixRotateYQ_asm(int32 quadrant);
-        void matrixRotateYXZ_asm(int32 angleX, int32 angleY, int32 angleZ);
-        void matrixFrame_asm(const void* pos, const void* angles);
-        void boxTranslate_asm(AABBi &box, int32 x, int32 y, int32 z);
-        void boxRotateYQ_asm(AABBi &box, int32 quadrant);
-        int32 sphereIsVisible_asm(int32 x, int32 y, int32 z, int32 r);
+        void matrixSetBasis_asm(Matrix &dst __asm("a0"), const Matrix &src __asm("a1"));
+        void matrixLerp_asm(const Matrix &n __asm("a0"), int32 pmul __asm("d0"), int32 pdiv __asm("d1"));
+        void matrixTranslateRel_asm(int32 x __asm("d0"), int32 y __asm("d1"), int32 z __asm("d2"));
+        void matrixTranslateAbs_asm(int32 x __asm("d0"), int32 y __asm("d1"), int32 z __asm("d2"));
+        void matrixTranslateSet_asm(int32 x __asm("d0"), int32 y __asm("d1"), int32 z __asm("d2"));
+        void matrixRotateX_asm(int32 angle __asm("d0"));
+        void matrixRotateY_asm(int32 angle __asm("d0"));
+        void matrixRotateZ_asm(int32 angle __asm("d0"));
+        void matrixRotateYQ_asm(int32 quadrant __asm("d0"));
+        void matrixRotateYXZ_asm(int32 angleX __asm("d0"), int32 angleY __asm("d1"), int32 angleZ __asm("d2"));
+        void matrixFrame_asm(const void* pos __asm("a0"), const void* angles __asm("a1"));
+        void boxTranslate_asm(AABBi &box __asm("a0"), int32 x __asm("d0"), int32 y __asm("d1"), int32 z __asm("d2"));
+        void boxRotateYQ_asm(AABBi &box __asm("a0"), int32 quadrant __asm("d0"));
+        int32 sphereIsVisible_asm(int32 x __asm("d0"), int32 y __asm("d1"), int32 z __asm("d2"), int32 r __asm("d3"));
         void flush_asm();
     }
 
@@ -2742,7 +2742,9 @@ vec3i boxPushOut(const AABBi &a, const AABBi &b);
     #define boxTranslate            boxTranslate_asm
     #define boxRotateYQ             boxRotateYQ_asm
     #define sphereIsVisible         sphereIsVisible_asm
-    #define flush                   flush_asm
+
+    void flush_c();
+    #define flush                   flush_c
 #else
     #define matrixPush              matrixPush_c
     #define matrixSetIdentity       matrixSetIdentity_c

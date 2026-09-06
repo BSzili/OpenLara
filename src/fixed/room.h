@@ -189,7 +189,16 @@ void Sector::getTriggerFloorCeiling(int32 x, int32 y, int32 z, int32* floor, int
 }
 
 #ifndef __32X__
-#if !defined(USE_ASM) || defined(__3DO__) // TODO for 3DO
+#if defined(__AMIGA__) && defined(USE_ASM)
+    extern "C" {
+        const Sector* getSector_asm(const Room* self __asm("a0"), int32 x __asm("d0"), int32 z __asm("d1"));
+    }
+
+    inline const Sector* Room::getSector(int32 x, int32 z) const
+    {
+        return getSector_asm(this, x, z);
+    }
+#elif !defined(USE_ASM) || defined(__3DO__) // TODO for 3DO
 const Sector* Room::getSector(int32 x, int32 z) const
 {
     // TODO remove clamp?

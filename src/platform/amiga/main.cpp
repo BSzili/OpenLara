@@ -38,8 +38,6 @@ static int updatePalette = 0;
 static int use_c2p = 0;
 static ULONG fsMonitorID = INVALID_ID;
 
-typedef void ASM (*c2p_write_bm_func)(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
-static c2p_write_bm_func c2p_write_bm;
 #ifdef ECSHACK
 extern "C" void ASM c2p1x1_4_c5_bm_word(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
 static UWORD ecsPalette[16] = { 0x0000, 0x0111, 0x0222, 0x0333, 0x0444, 0x0555, 0x0666, 0x0777, 0x0888, 0x0999, 0x0AAA, 0x0BBB, 0x0CCC, 0x0DDD, 0x0EEE, 0x0FFF };
@@ -48,6 +46,23 @@ static uint8 ecsRemap[256];
 #else
 extern "C" void ASM c2p1x1_8_c5_bm(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
 extern "C" void ASM c2p1x1_8_c5_bm_040(REG(d0, WORD chunkyx), REG(d1, WORD chunkyy), REG(d2, WORD offsx), REG(d3, WORD offsy), REG(a0, APTR chunkyscreen), REG(a1, struct BitMap *bitmap));
+
+static int c2p_use_040 = 0;
+
+static void c2p_write_bm(WORD chunkyx, WORD chunkyy, WORD offsx, WORD offsy, APTR chunkyscreen, struct BitMap *bitmap)
+{
+    register WORD r_d0 __asm("d0") = chunkyx;
+    register WORD r_d1 __asm("d1") = chunkyy;
+    register WORD r_d2 __asm("d2") = offsx;
+    register WORD r_d3 __asm("d3") = offsy;
+    register APTR r_a0 __asm("a0") = chunkyscreen;
+    register struct BitMap *r_a1 __asm("a1") = bitmap;
+
+    if (c2p_use_040)
+        c2p1x1_8_c5_bm_040(r_d0, r_d1, r_d2, r_d3, r_a0, r_a1);
+    else
+        c2p1x1_8_c5_bm(r_d0, r_d1, r_d2, r_d3, r_a0, r_a1);
+}
 #endif
 
 
@@ -114,7 +129,7 @@ static void parseTooltypes(void)
     if ((appicon = GetDiskObject((STRPTR)exename))) {
         char *value;
 
-        if ((value = (char *)FindToolType((CONST STRPTR *)appicon->do_ToolTypes, (CONST_STRPTR)"FORCEMODE"))) {
+        if ((value = (char *)FindToolType((CONST_STRPTR *)(uintptr_t)appicon->do_ToolTypes, (CONST_STRPTR)"FORCEMODE"))) {
             if (!strcmp(value, "NTSC"))
                 fsMonitorID = NTSC_MONITOR_ID;
             else if (!strcmp(value, "PAL"))
@@ -132,6 +147,7 @@ static void parseTooltypes(void)
             else if (!strcmp(value, "DBLPAL"))
                 fsMonitorID = DBLPAL_MONITOR_ID;
         }
+
         FreeDiskObject(appicon);
     }
 }
@@ -196,6 +212,17 @@ void setVideoMode()
         //SA_Overscan, OSCAN_MAX,
         TAG_DONE);
 
+    if (!screen)
+    {
+        if (CyberGfxBase)
+        {
+            CloseLibrary(CyberGfxBase);
+            CyberGfxBase = NULL;
+        }
+        
+        return;
+    }
+
 #ifdef ECSHACK
     LoadRGB4(&screen->ViewPort, ecsPalette, 16);
 #endif
@@ -207,9 +234,51 @@ void setVideoMode()
         WA_CustomScreen, (ULONG)screen,
         TAG_DONE);
 
+    if (!window)
+    {
+        CloseScreen(screen);
+        screen = NULL;
+
+        if (CyberGfxBase)
+        {
+            CloseLibrary(CyberGfxBase);
+            CyberGfxBase = NULL;
+        }
+        
+        return;
+    }
+
     use_c2p = FALSE;
     if ((GetBitMapAttr(screen->RastPort.BitMap, BMA_FLAGS) & BMF_STANDARD)) {
-        if (!(sbuf[0] = AllocScreenBuffer(screen, 0, SB_SCREEN_BITMAP)) || !(sbuf[1] = AllocScreenBuffer(screen, 0, SB_COPY_BITMAP))) {
+        sbuf[0] = AllocScreenBuffer(screen, 0, SB_SCREEN_BITMAP);
+        sbuf[1] = AllocScreenBuffer(screen, 0, SB_COPY_BITMAP);
+        
+        if (!sbuf[0] || !sbuf[1])
+        {
+            if (sbuf[1])
+            {
+                FreeScreenBuffer(screen, sbuf[1]);
+                sbuf[1] = NULL;
+            }
+
+            if (sbuf[0])
+            {
+                FreeScreenBuffer(screen, sbuf[0]);
+                sbuf[0] = NULL;
+            }
+            
+            CloseWindow(window);
+            window = NULL;
+            
+            CloseScreen(screen);
+            screen = NULL;
+            
+            if (CyberGfxBase)
+            {
+                CloseLibrary(CyberGfxBase);
+                CyberGfxBase = NULL;
+            }
+
             return; // TODO fallback to WCP?
         }
 
@@ -224,28 +293,39 @@ void setVideoMode()
 
 void setTextMode()
 {
+    if (use_c2p && screen && sbuf[0] && sbuf[1])
+    {
+        ChangeScreenBuffer(screen, sbuf[0]);
+        WaitTOF();
+    }
+
+    if (sbuf[1])
+    {
+        FreeScreenBuffer(screen, sbuf[1]);
+        sbuf[1] = NULL;
+    }
+
     if (sbuf[0])
     {
         FreeScreenBuffer(screen, sbuf[0]);
         sbuf[0] = NULL;
     }
-    if (sbuf[1])
-    {
-        FreeScreenBuffer(screen,sbuf[1]);
-        sbuf[1] = NULL;
-    }
+
     if (window) {
         CloseWindow(window);
         window = NULL;
     }
+
     if (screen) {
         CloseScreen(screen);
         screen = NULL;
     }
+
     if (pointermem) {
         FreeVec(pointermem);
         pointermem = NULL;
     }
+    
     if (CyberGfxBase) {
         CloseLibrary(CyberGfxBase);
         CyberGfxBase = NULL;
@@ -305,14 +385,17 @@ void videoRelease()
 
 void waitVBlank()
 {
-    //WaitTOF();
+    WaitTOF();
 }
 
 void blit()
 {
-    if (screen && screen == IntuitionBase->FirstScreen && !(window->Flags & WFLG_WINDOWACTIVE)) {
+    if (screen && window && screen == IntuitionBase->FirstScreen && !(window->Flags & WFLG_WINDOWACTIVE)) {
         ActivateWindow(window);
     }
+
+    if (!screen || !window)
+        return;
 
     if (updatePalette) {
 #ifdef ECSHACK
@@ -491,6 +574,10 @@ const void* osLoadScreen(LevelID id)
     if (!TITLE_SCR)
     {
         uint8* data = new uint8[FRAME_WIDTH * FRAME_HEIGHT];
+
+        if (!data)
+            return NULL;
+
         memset(data, 0, FRAME_WIDTH * FRAME_HEIGHT);
         BPTR f = Open("data/TITLE.SCR", MODE_OLDFILE);
         if (f)
@@ -536,16 +623,21 @@ const void* osLoadLevel(LevelID id)
     if (!f)
         return NULL;
 
-    {
-        Seek(f, 0, OFFSET_END);
-        int32 size = Seek(f, 0, OFFSET_CURRENT);
-        Seek(f, 0, OFFSET_BEGINNING);
-        uint8* data = new uint8[size];
-        Read(f, data, size);
-        Close(f);
+    Seek(f, 0, OFFSET_END);
+    int32 size = Seek(f, 0, OFFSET_CURRENT);
+    Seek(f, 0, OFFSET_BEGINNING);
+    uint8* data = new uint8[size];
 
-        levelData = data;
+    if (!data)
+    {
+        Close(f);
+        return NULL;
     }
+
+    Read(f, data, size);
+    Close(f);
+
+    levelData = data;
 
     return (void*)levelData;
 }
@@ -598,11 +690,16 @@ int main(void)
 #else
     gLightmap = (uint8*)AllocMem(256 * 32, MEMF_ANY);
 #endif
+
+    if (!gLightmap)
+    {
+        inputRelease();
+        videoRelease();
+        return 0;
+    }
+
 #ifndef ECSHACK
-    if (SysBase->AttnFlags & AFF_68040)
-        c2p_write_bm = c2p1x1_8_c5_bm_040;
-    else
-        c2p_write_bm = c2p1x1_8_c5_bm;
+    c2p_use_040 = (SysBase->AttnFlags & AFF_68040) ? 1 : (SysBase->AttnFlags & AFF_68060) ? 1 : 0;
 #endif
 
     sndInit();
@@ -625,11 +722,20 @@ int main(void)
         int32 frame = frameIndex / 2;
         int32 delta = frame - lastFrameIndex;
 
-        if (!delta)
-            continue;
-        lastFrameIndex = frame;
+        #ifdef NO_FPS_CAP
+            if (delta)
+            {
+                lastFrameIndex = frame;
+                gameUpdate(delta);
+            }
+        #else
+            if (!delta)
+                continue;
 
-        gameUpdate(delta);
+            lastFrameIndex = frame;
+
+            gameUpdate(delta);
+        #endif
 
         #ifdef PROFILING
             waitVBlank();
@@ -658,9 +764,14 @@ int main(void)
     extern void sndFree();
     sndFree();
 
-    FreeMem(gLightmap, 256 * 32);
+    if (gLightmap)
+    {
+        FreeMem(gLightmap, 256 * 32);
+        gLightmap = NULL;
+    }
 
     inputRelease();
+
     videoRelease();
 
     return 0;
@@ -669,8 +780,6 @@ int main(void)
 #define abs _abs_
 #define itoa _itoa_
 #include <stdlib.h>
-
-struct _reent *_impure_ptr;
 
 void* operator new(size_t size)
 {
